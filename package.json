@@ -4,11 +4,16 @@
   "description": "",
   "main": "server/index.js",
   "scripts": {
-    "start": "nodemon server/index.js localhost 8080"
+    "start": "nodemon server/index.js localhost 8080",
+    "testrpc": "ganache-cli --defaultBalanceEther 99999999999 --networkId 1234 -m 'dltlt'",
+    "deploy": "truffle migrate",
+    "compile": "truffle compile"
   },
   "dependencies": {
     "express": "4.16.4",
-    "socket.io": "2.1.1"
+    "ganache-cli": "^6.9.1",
+    "socket.io": "2.1.1",
+    "truffle": "^5.1.15"
   },
   "devDependencies": {
     "nodemon": "1.18.4"

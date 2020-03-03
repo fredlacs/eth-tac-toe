@@ -3,6 +3,8 @@
 //   let socket = io.connect(url);
 // };
 
+import {sign} from "./state-channel.js"
+
 const url = window.location.origin;
 let socket = io.connect(url);
 
@@ -75,11 +77,20 @@ function makeMove(e) {
     return;
   }
 
-  // Emit the move to the server
-  socket.emit("make.move", {
-    symbol: symbol,
-    position: $(this).attr("id")
-  });
+
+  let position = $(this).attr("id")
+
+  // sign move made  
+  sign("randmsg", function(signature) {
+    console.log(signature)
+    // TODO: add sig to message sent
+    // Emit the move to the server
+    socket.emit("make.move", {
+      symbol: symbol,
+      position: position
+    });
+  })
+  
 }
 
 // Event is called when either player makes a move
