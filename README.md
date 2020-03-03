@@ -13,5 +13,9 @@ npm run testrpc
 ```
 
 ```
+npm run compile
+```
+
+```
 npm run deploy
 ```
