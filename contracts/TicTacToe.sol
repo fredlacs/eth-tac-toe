@@ -44,6 +44,7 @@ contract TicTacToe {
         bytes32 newStateRoot,
         uint8[9] memory boardState,
         uint8 gameStatus,
+        uint256 nonce,
         bytes memory signatures
     )
         public
