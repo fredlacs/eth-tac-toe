@@ -11,7 +11,8 @@ contract TicTacToe {
     }
 
     struct Match {
-        bool started;
+        address[2] players;
+        bool inProgress;
         bytes32 currentStateRoot;
         bool dispute;
         uint256 disputeTimeLimit;
@@ -33,38 +34,48 @@ contract TicTacToe {
 
         // hash address of the 2 players and nonce
         matchId = keccak256(abi.encode(msg.sender, opponent, nonce));
-        matches[matchId].started = true;
+        matches[matchId].inProgress = true;
         matches[matchId].disputeTimeLimit = disputeTimeLimit;
+        matches[matchId].players = [msg.sender, opponent];
+
+        // TODO: does the opponent need to accept the challenge?
 
         emit NewMatch(msg.sender, opponent, matchId);
         return matchId;
     }
 
     function updateMatchState(
+        bytes32 matchId
         bytes32 newStateRoot,
         uint8[9] memory boardState,
         uint8 gameStatus,
-        uint256 nonce,
+        uint256 stateRootNonce,
         bytes memory signatures
     )
         public
     {
+        Match memory match = matches[matchId];
+
+        require(match.inProgress, "State root can only be updated for matches in progress");
+        require(
+            match.players[0] == msg.sender || match.players[1] == msg.sender,
+            "Must be a player in the match in order to update state root"
+        );
+
         if(gameStatus == 0) {
-            // in progress
+            // rlp encode board and mode_modifier
+            // hash them and require they equal state root
+            // verify signatures
+            // resolve dispute if any
         } else if(gameStatus == 1) {
-            // win
+            // player 1 win
         } else if(gameStatus == 2) {
-            // loss
-        } else {
+            // player 2 win
+        } else if(gameStatus == 3){
             // draw
+        } else {
+            revert("invalid game status")
         }
-
-        // rlp encode board and mode_modifier
-        // hash them and require they equal state root
-        // verify signatures
-
-
-        // resolve dispute if any
     }
 
     // start dispute stating state transition you wish
