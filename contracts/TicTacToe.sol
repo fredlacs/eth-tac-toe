@@ -99,6 +99,8 @@ contract TicTacToe {
     {
         Match memory currMatch = matches[matchId];
 
+        // TODO: require that parameters correctly build the signed root
+
         if(gameStatus == 0) {
             // no need to validate state as both parties agree
 
