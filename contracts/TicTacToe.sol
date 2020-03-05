@@ -45,7 +45,7 @@ contract TicTacToe {
     }
 
     function updateMatchState(
-        bytes32 matchId
+        bytes32 matchId,
         bytes32 newStateRoot,
         uint8[9] memory boardState,
         uint8 gameStatus,
@@ -54,11 +54,11 @@ contract TicTacToe {
     )
         public
     {
-        Match memory match = matches[matchId];
+        Match memory currMatch = matches[matchId];
 
-        require(match.inProgress, "State root can only be updated for matches in progress");
+        require(currMatch.inProgress, "State root can only be updated for matches in progress");
         require(
-            match.players[0] == msg.sender || match.players[1] == msg.sender,
+            currMatch.players[0] == msg.sender || currMatch.players[1] == msg.sender,
             "Must be a player in the match in order to update state root"
         );
 
@@ -74,7 +74,7 @@ contract TicTacToe {
         } else if(gameStatus == 3){
             // draw
         } else {
-            revert("invalid game status")
+            revert("invalid game status");
         }
     }
 
