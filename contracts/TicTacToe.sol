@@ -1,9 +1,14 @@
 pragma solidity ^0.5.0;
 
-import "./SafeMath.sol";
+import "./Libraries/SafeMath.sol";
+import "./Libraries/RLP.sol";
+import "./Libraries/ECDSA.sol";
 
 contract TicTacToe {
     using SafeMath for uint256;
+    using RLPReader for RLPReader.RLPItem;
+    using RLPReader for bytes;
+    using ECDSA for bytes32;
 
     struct Player {
         uint256 wins;
@@ -41,7 +46,7 @@ contract TicTacToe {
         playerStats[msg.sender].opponentNonce[opponent] = playerStats[msg.sender].opponentNonce[opponent].add(1);
         uint256 nonce = playerStats[msg.sender].opponentNonce[opponent];
 
-        // hash address of the 2 players and nonce
+        // no need to verify if matchId is unique, if we assume the hash function is collision resistant
         matchId = keccak256(abi.encode(msg.sender, opponent, nonce));
         matches[matchId].inProgress = true;
         // dispute time limit in seconds
@@ -93,7 +98,7 @@ contract TicTacToe {
         uint8[9] memory boardState,
         uint8 gameStatus,
         uint256 stateRootNonce,
-        bytes memory signatures
+        bytes memory rlpEncodedSignatures
     )
         public matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId)
     {
@@ -102,7 +107,15 @@ contract TicTacToe {
 
         // users should have signed this state root
         bytes32 stateRoot = keccak256(abi.encode(boardState, gameStatus, stateRootNonce));
-        // TODO: require the signatures are correct
+
+        RLPReader.RLPItem[] memory signatures = rlpEncodedSignatures.toRlpItem().toList();
+        address[2] memory players = [
+            stateRoot.recover(signatures[0].toBytes()),
+            stateRoot.recover(signatures[1].toBytes())
+        ];
+        // we assume the first signature is from player 1, the player that called startMatch(...)
+        require(players[0] == currMatch.players[0], "Wrong signature for player 1");
+        require(players[1] == currMatch.players[1], "Wrong signature for player 2");
 
         if(gameStatus == 0) {
             // if game in progress, gameStatus == 0
