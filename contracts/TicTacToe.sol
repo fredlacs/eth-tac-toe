@@ -17,6 +17,7 @@ contract TicTacToe {
         address[2] players;
         bool inProgress;
         bytes32 currentStateRoot;
+        uint256 currentStateRootNonce;
         bool dispute;
         uint256 disputeStartTimestamp;
         uint256 disputeTimeLimit;
@@ -89,7 +90,6 @@ contract TicTacToe {
 
     function updateMatchState(
         bytes32 matchId,
-        bytes32 newStateRoot,
         uint8[9] memory boardState,
         uint8 gameStatus,
         uint256 stateRootNonce,
@@ -98,18 +98,17 @@ contract TicTacToe {
         public matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId)
     {
         Match memory currMatch = matches[matchId];
+        require(stateRootNonce > currMatch.currentStateRootNonce, "Trying to update a state with a nonce smaller than the current one");
 
-        // TODO: require that parameters correctly build the signed root
+        // users should have signed this state root
+        bytes32 stateRoot = keccak256(abi.encode(boardState, gameStatus, stateRootNonce));
+        // TODO: require the signatures are correct
 
         if(gameStatus == 0) {
-            // no need to validate state as both parties agree
-
-            // rlp encode board and mode_modifier
-            // hash them and require they equal state root
-            // verify signatures
-
-            // resolve dispute if any were there
-
+            // if game in progress, gameStatus == 0
+            matches[matchId].currentStateRoot = stateRoot;
+            matches[matchId].currentStateRootNonce = stateRootNonce;
+            matches[matchId].dispute = false;
         } else if(gameStatus == 1 || gameStatus == 2) {
             // if player 1 won, gameStatus == 1
             // if player 2 won, gameStatus == 2
