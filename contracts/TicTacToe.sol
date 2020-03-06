@@ -131,7 +131,7 @@ contract TicTacToe {
         } else if(gameStatus == 3) {
             // if game was a draw, gameStatus == 3
             address[2] memory players = currMatch.players;
-    
+
             // add a draw for player 1
             playerStats[players[0]].draws = playerStats[players[0]].draws.add(1);
             // add a draw for player 2
@@ -191,9 +191,11 @@ contract TicTacToe {
     }
 
     function playerWonMatch(bytes32 matchId, address winner) internal {
-        // TODO: infer looser and add loss
+        // infer the looser based on winner, as its a 2 player game
+        address looser = matches[matchId].players[0] == winner ? matches[matchId].players[1] : matches[matchId].players[0];
 
         playerStats[winner].wins = playerStats[winner].wins.add(1);
+        playerStats[looser].losses = playerStats[winner].wins.add(1);
 
         // game finished
         matches[matchId].inProgress = false;
