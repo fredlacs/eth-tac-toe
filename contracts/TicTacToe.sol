@@ -103,7 +103,11 @@ contract TicTacToe {
         public matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId)
     {
         Match memory currMatch = matches[matchId];
-        require(stateRootNonce > currMatch.currentStateRootNonce, "Trying to update a state with a nonce smaller than the current one");
+
+        require(
+            stateRootNonce > currMatch.currentStateRootNonce,
+            "Trying to update a state with a nonce smaller than the current one"
+        );
 
         // users should have signed this state root
         bytes32 stateRoot = keccak256(abi.encode(boardState, gameStatus, stateRootNonce));
@@ -164,7 +168,10 @@ contract TicTacToe {
     // bob accepts the state and sends his next move
     function resolveDispute(bytes32 matchId)
         public
-        matchInProgress(matchId) matchInDispute(matchId) matchDisputeNotExpired(matchId) playerIsPartOfMatch(msg.sender, matchId)
+        matchInProgress(matchId)
+        matchInDispute(matchId)
+        matchDisputeNotExpired(matchId)
+        playerIsPartOfMatch(msg.sender, matchId)
     {
         // Match memory currMatch = matches[matchId];
 
