@@ -125,9 +125,9 @@ contract TicTacToe {
 
         if(gameStatus == 0) {
             // if game in progress, gameStatus == 0
+            require(!matches[matchId].dispute, "Dispute is currently in place, can't update state normally");
             matches[matchId].currentStateRoot = stateRoot;
             matches[matchId].currentStateRootNonce = stateRootNonce;
-            matches[matchId].dispute = false;
         } else if(gameStatus == 1 || gameStatus == 2) {
             // if player 1 won, gameStatus == 1
             // if player 2 won, gameStatus == 2
@@ -146,6 +146,15 @@ contract TicTacToe {
             // game finished
             matches[matchId].inProgress = false;
             emit MatchDrawn(matchId);
+        } else if(gameStatus == 4) {
+            // if both parties agree to ignore dispute and continue to new state, gameStatus == 4
+            // A separate game status is needed to resolve disputes with a new root to stop attacks
+            // ie. Alice signs and sends state to Bob. Bob ignores the signed state, and Alice starts a dispute
+            // Bob could know just sign it and submit the state. This could be desireable for Alice,
+            // but by requiring a new signature, resolving the dispute requires Alice's consent
+            matches[matchId].currentStateRoot = stateRoot;
+            matches[matchId].currentStateRootNonce = stateRootNonce;
+            matches[matchId].dispute = false;
         } else {
             revert("invalid game status");
         }
