@@ -111,6 +111,8 @@ contract TicTacToe {
 
         // users should have signed this state root
         bytes32 stateRoot = keccak256(abi.encode(boardState, gameStatus, stateRootNonce));
+        // messages signed are prepended with "\x19Ethereum Signed Message:\n32" for safety
+        stateRoot = stateRoot.toEthSignedMessageHash();
 
         RLPReader.RLPItem[] memory signatures = rlpEncodedSignatures.toRlpItem().toList();
         address[2] memory players = [
