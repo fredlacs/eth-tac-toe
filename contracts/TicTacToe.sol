@@ -202,8 +202,33 @@ contract TicTacToe {
         // messages signed are prepended with "\x19Ethereum Signed Message:\n32" for safety
         stateRoot = stateRoot.toEthSignedMessageHash();
 
-        // Update game state
-        updateMatchState(matchId, gameStatus, stateNonce, stateRoot);
+        if(isWinningState(newState)) {
+            playerWonMatch(matchId, msg.sender);
+        } else {
+            // Update game state
+            updateMatchState(matchId, gameStatus, stateNonce, stateRoot);
+        }
+    }
+
+    function isWinningState(uint8[9] state) internal returns (bool) {
+        uint8[8] memory rows = [
+            state[0] & state[1] & state[2],
+            state[3] & state[4] & state[5],
+            state[6] & state[7] & state[8],
+            state[0] & state[3] & state[6],
+            state[1] & state[4] & state[7],
+            state[2] & state[5] & state[8],
+            state[0] & state[4] & state[8],
+            state[2] & state[4] & state[6]
+        ];
+        // Loop over all of the rows and check if they bitwise and to 0x01 or 0x02
+        for (uint8 i = 0; i < rows.length; i++) {
+            if (rows[i] == 0x01 || rows[i] == 0x02) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // bob acknowledges and cancels the termination
