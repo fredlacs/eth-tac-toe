@@ -23,9 +23,9 @@ contract TicTacToe {
         bool inProgress;
         bytes32 currentStateRoot;
         uint256 currentStateRootNonce;
-        bool dispute;
-        uint256 disputeStartTimestamp;
-        uint256 disputeTimeLimit;
+        bool termination;
+        uint256 terminationStartTimestamp;
+        uint256 terminationTimeLimit;
     }
 
     // map from player address to his stats
@@ -36,10 +36,10 @@ contract TicTacToe {
     event MatchStarted(address player1, address player2, bytes32 matchId);
     event MatchWon(address winner, bytes32 matchId);
     event MatchDrawn(bytes32 matchId);
-    event DisputeStarted(bytes32 matchId, uint256 disputeTimeLimit);
-    event DisputeResolved(bytes32 matchId);
+    event TerminationStarted(bytes32 matchId, uint256 terminationTimeLimit);
+    event TerminationCancelled(bytes32 matchId);
 
-    function startMatch(address opponent, uint256 disputeTimeLimit)
+    function startMatch(address opponent, uint256 terminationTimeLimit)
         public
         returns (bytes32 matchId)
     {
@@ -49,11 +49,9 @@ contract TicTacToe {
         // no need to verify if matchId is unique, if we assume the hash function is collision resistant
         matchId = keccak256(abi.encode(msg.sender, opponent, nonce));
         matches[matchId].inProgress = true;
-        // dispute time limit in seconds
-        matches[matchId].disputeTimeLimit = disputeTimeLimit;
+        // termination time limit in seconds
+        matches[matchId].terminationTimeLimit = terminationTimeLimit;
         matches[matchId].players = [msg.sender, opponent];
-
-        // TODO: does the opponent need to accept the challenge?
 
         emit MatchStarted(msg.sender, opponent, matchId);
         return matchId;
@@ -64,23 +62,23 @@ contract TicTacToe {
         _;
     }
 
-    modifier matchInDispute(bytes32 matchId) {
-        require(matches[matchId].dispute, "Match is not in dispute");
+    modifier terminationInProgress(bytes32 matchId) {
+        require(matches[matchId].termination, "Match is not in termination");
         _;
     }
 
-    modifier matchDisputeNotExpired(bytes32 matchId) {
+    modifier matchTerminationNotExpired(bytes32 matchId) {
         require(
-            matches[matchId].disputeStartTimestamp + matches[matchId].disputeTimeLimit <= block.timestamp,
-            "Time limit to resolve dispute expired"
+            matches[matchId].terminationStartTimestamp + matches[matchId].terminationTimeLimit <= block.timestamp,
+            "Time limit to resolve termination expired"
         );
         _;
     }
 
-    modifier matchDisputeExpired(bytes32 matchId) {
+    modifier matchTerminationExpired(bytes32 matchId) {
         require(
-            matches[matchId].disputeStartTimestamp + matches[matchId].disputeTimeLimit > block.timestamp,
-            "Time limit to resolve dispute has not expired"
+            matches[matchId].terminationStartTimestamp + matches[matchId].terminationTimeLimit > block.timestamp,
+            "Time limit to resolve termination has not expired"
         );
         _;
     }
@@ -93,7 +91,7 @@ contract TicTacToe {
         _;
     }
 
-    function updateMatchState(
+    function sendStateUpdate(
         bytes32 matchId,
         uint8[9] memory boardState,
         uint8 gameStatus,
@@ -119,15 +117,33 @@ contract TicTacToe {
             stateRoot.recover(signatures[0].toBytes()),
             stateRoot.recover(signatures[1].toBytes())
         ];
+
         // we assume the first signature is from player 1, the player that called startMatch(...)
         require(players[0] == currMatch.players[0], "Wrong signature for player 1");
         require(players[1] == currMatch.players[1], "Wrong signature for player 2");
 
+        updateMatchState(matchId, boardState, gameStatus, stateRootNonce, stateRoot);
+    }
+
+    function updateMatchState(
+        bytes32 matchId,
+        uint8[9] memory boardState,
+        uint8 gameStatus,
+        uint256 stateRootNonce, 
+        bytes32 stateRoot
+    ) 
+        internal matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId) 
+    {
+        Match memory currMatch = matches[matchId];
+        
         if(gameStatus == 0) {
             // if game in progress, gameStatus == 0
-            require(!matches[matchId].dispute, "Dispute is currently in place, can't update state normally");
-            matches[matchId].currentStateRoot = stateRoot;
-            matches[matchId].currentStateRootNonce = stateRootNonce;
+            if(currMatch.termination){
+                currMatch.termination = false;
+                emit TerminationCancelled(matchId);
+            }
+            currMatch.currentStateRoot = stateRoot;
+            currMatch.currentStateRootNonce = stateRootNonce;
         } else if(gameStatus == 1 || gameStatus == 2) {
             // if player 1 won, gameStatus == 1
             // if player 2 won, gameStatus == 2
@@ -144,68 +160,73 @@ contract TicTacToe {
             playerStats[players[1]].draws = playerStats[players[1]].draws.add(1);
 
             // game finished
-            matches[matchId].inProgress = false;
+            currMatch.inProgress = false;
             emit MatchDrawn(matchId);
-        } else if(gameStatus == 4) {
-            // if both parties agree to ignore dispute and continue to new state, gameStatus == 4
-            // A separate game status is needed to resolve disputes with a new root to stop attacks
-            // ie. Alice signs and sends state to Bob. Bob ignores the signed state, and Alice starts a dispute
-            // Bob could know just sign it and submit the state. This could be desireable for Alice,
-            // but by requiring a new signature, resolving the dispute requires Alice's consent
-            matches[matchId].currentStateRoot = stateRoot;
-            matches[matchId].currentStateRootNonce = stateRootNonce;
-            matches[matchId].dispute = false;
         } else {
             revert("invalid game status");
         }
     }
 
-
-    // start dispute stating state transition you wish
-    function startDispute(bytes32 matchId) public matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId) {
+    // start termination
+    function forceStateUpdate(
+        bytes32 matchId,
+        uint8[9] memory previousBoardState,
+        uint8 move,
+        uint8 gameStatus,
+        uint256 stateRootNonce
+    ) 
+        public matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId) 
+    {
         // check if transition is valid
-        // if transition valid, start dispute timer for opponent to answer
         Match memory currMatch = matches[matchId];
+        uint8[9] memory newState = previousBoardState;
 
-        // TODO: add the state to validation
-        require(validGameState(), "The state you are trying to submit is not valid");
+        // check the game state is valid
+        // check it's the player's turn
+        if(stateRootNonce % 2 == 0) {
+            require(msg.sender == currMatch.players[0], "Not player 1 turn");
+            newState[move] = 1;
+        } else {
+            require(msg.sender == currMatch.players[0], "Not player 2 turn");
+            newState[move] = 2;
+        }
+        // check that the space isn't already checked
+        require(previousBoardState[move] == 0, "Cell already occupied");
 
-        matches[matchId].dispute = true;
-        // could use current block number
-        matches[matchId].disputeStartTimestamp = block.timestamp;
-        emit DisputeStarted(matchId, currMatch.disputeTimeLimit);
+        if(currMatch.termination){
+            matches[matchId].termination = false;
+            emit TerminationCancelled(matchId);
+        }
+
+        bytes32 stateRoot = keccak256(abi.encode(newState, gameStatus, stateRootNonce));
+        // messages signed are prepended with "\x19Ethereum Signed Message:\n32" for safety
+        stateRoot = stateRoot.toEthSignedMessageHash();
+
+        // Update game state
+        updateMatchState(matchId, newState, gameStatus, stateRootNonce, stateRoot);
     }
 
     // bob accepts the state and sends his next move
-    function resolveDispute(bytes32 matchId)
+    function cancelTermination(bytes32 matchId)
         public
         matchInProgress(matchId)
-        matchInDispute(matchId)
-        matchDisputeNotExpired(matchId)
+        terminationInProgress(matchId)
+        matchTerminationNotExpired(matchId)
         playerIsPartOfMatch(msg.sender, matchId)
     {
-        // Match memory currMatch = matches[matchId];
-
-        // TODO: add the state to validation
-        require(validGameState(), "The state you are trying to submit is not valid");
-
-        matches[matchId].dispute = false;
-        emit DisputeResolved(matchId);
+        matches[matchId].termination = false;
+        emit TerminationCancelled(matchId);
     }
 
-    // bob did not answer the dispute, so alice forces a win
-    function terminateDispute(bytes32 matchId)
+    // open a termination window
+    function startTermination(bytes32 matchId)
         public
-        matchDisputeExpired(matchId) playerIsPartOfMatch(msg.sender, matchId)
+        matchTerminationExpired(matchId) playerIsPartOfMatch(msg.sender, matchId)
     {
-        // player has won the game
-        matches[matchId].dispute = false;
-        playerWonMatch(matchId, msg.sender);
-    }
-
-    function validGameState() internal returns (bool) {
-        // what happens if this valid game state wins the game? trigger win function
-        return true;
+        matches[matchId].termination = true;
+        // could use current block number
+        matches[matchId].terminationStartTimestamp = block.timestamp;
+        emit TerminationStarted(matchId, matches[matchId].terminationTimeLimit);
     }
 
     function playerWonMatch(bytes32 matchId, address winner) internal {
