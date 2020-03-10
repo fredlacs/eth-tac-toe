@@ -96,7 +96,8 @@ contract TicTacToe {
         uint8[9] memory boardState,
         uint8 gameStatus,
         uint256 stateNonce,
-        bytes memory rlpEncodedSignatures
+        bytes memory signaturePlayer1,
+        bytes memory signaturePlayer2
     )
         public matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId)
     {
@@ -112,30 +113,29 @@ contract TicTacToe {
         // messages signed are prepended with "\x19Ethereum Signed Message:\n32" for safety
         stateRoot = stateRoot.toEthSignedMessageHash();
 
-        RLPReader.RLPItem[] memory signatures = rlpEncodedSignatures.toRlpItem().toList();
+        // get address used to sign state root
         address[2] memory players = [
-            stateRoot.recover(signatures[0].toBytes()),
-            stateRoot.recover(signatures[1].toBytes())
+            stateRoot.recover(signaturePlayer1),
+            stateRoot.recover(signaturePlayer2)
         ];
 
         // we assume the first signature is from player 1, the player that called startMatch(...)
         require(players[0] == currMatch.players[0], "Wrong signature for player 1");
         require(players[1] == currMatch.players[1], "Wrong signature for player 2");
 
-        updateMatchState(matchId, boardState, gameStatus, stateNonce, stateRoot);
+        updateMatchState(matchId, gameStatus, stateNonce, stateRoot);
     }
 
     function updateMatchState(
         bytes32 matchId,
-        uint8[9] memory boardState,
         uint8 gameStatus,
-        uint256 stateNonce, 
+        uint256 stateNonce,
         bytes32 stateRoot
-    ) 
-        internal matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId) 
+    )
+        internal
     {
         Match memory currMatch = matches[matchId];
-        
+
         if(gameStatus == 0) {
             // if game in progress, gameStatus == 0
             if(currMatch.termination){
@@ -175,7 +175,7 @@ contract TicTacToe {
         uint8 gameStatus,
         uint256 stateNonce
     )
-        public matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId) 
+        public matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId)
     {
         // check if transition is valid
         Match memory currMatch = matches[matchId];
@@ -203,7 +203,7 @@ contract TicTacToe {
         stateRoot = stateRoot.toEthSignedMessageHash();
 
         // Update game state
-        updateMatchState(matchId, newState, gameStatus, stateNonce, stateRoot);
+        updateMatchState(matchId, gameStatus, stateNonce, stateRoot);
     }
 
     // bob acknowledges and cancels the termination
