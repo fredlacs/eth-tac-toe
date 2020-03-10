@@ -174,7 +174,7 @@ contract TicTacToe {
         uint8 move,
         uint8 gameStatus,
         uint256 stateRootNonce
-    ) 
+    )
         public matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId) 
     {
         // check if transition is valid
@@ -206,7 +206,7 @@ contract TicTacToe {
         updateMatchState(matchId, newState, gameStatus, stateRootNonce, stateRoot);
     }
 
-    // bob accepts the state and sends his next move
+    // bob acknowledges and cancels the termination
     function cancelTermination(bytes32 matchId)
         public
         matchInProgress(matchId)
