@@ -22,7 +22,7 @@ contract TicTacToe {
         address[2] players;
         bool inProgress;
         bytes32 currentStateRoot;
-        uint256 currentStateRootNonce;
+        uint256 currentStateNonce;
         bool termination;
         uint256 terminationStartTimestamp;
         uint256 terminationTimeLimit;
@@ -95,7 +95,7 @@ contract TicTacToe {
         bytes32 matchId,
         uint8[9] memory boardState,
         uint8 gameStatus,
-        uint256 stateRootNonce,
+        uint256 stateNonce,
         bytes memory rlpEncodedSignatures
     )
         public matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId)
@@ -103,12 +103,12 @@ contract TicTacToe {
         Match memory currMatch = matches[matchId];
 
         require(
-            stateRootNonce > currMatch.currentStateRootNonce,
+            stateNonce > currMatch.currentStateNonce,
             "Trying to update a state with a nonce smaller than the current one"
         );
 
         // users should have signed this state root
-        bytes32 stateRoot = keccak256(abi.encode(boardState, gameStatus, stateRootNonce));
+        bytes32 stateRoot = keccak256(abi.encode(boardState, gameStatus, stateNonce));
         // messages signed are prepended with "\x19Ethereum Signed Message:\n32" for safety
         stateRoot = stateRoot.toEthSignedMessageHash();
 
@@ -122,14 +122,14 @@ contract TicTacToe {
         require(players[0] == currMatch.players[0], "Wrong signature for player 1");
         require(players[1] == currMatch.players[1], "Wrong signature for player 2");
 
-        updateMatchState(matchId, boardState, gameStatus, stateRootNonce, stateRoot);
+        updateMatchState(matchId, boardState, gameStatus, stateNonce, stateRoot);
     }
 
     function updateMatchState(
         bytes32 matchId,
         uint8[9] memory boardState,
         uint8 gameStatus,
-        uint256 stateRootNonce, 
+        uint256 stateNonce, 
         bytes32 stateRoot
     ) 
         internal matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId) 
@@ -143,7 +143,7 @@ contract TicTacToe {
                 emit TerminationCancelled(matchId);
             }
             currMatch.currentStateRoot = stateRoot;
-            currMatch.currentStateRootNonce = stateRootNonce;
+            currMatch.currentStateNonce = stateNonce;
         } else if(gameStatus == 1 || gameStatus == 2) {
             // if player 1 won, gameStatus == 1
             // if player 2 won, gameStatus == 2
@@ -173,7 +173,7 @@ contract TicTacToe {
         uint8[9] memory previousBoardState,
         uint8 move,
         uint8 gameStatus,
-        uint256 stateRootNonce
+        uint256 stateNonce
     )
         public matchInProgress(matchId) playerIsPartOfMatch(msg.sender, matchId) 
     {
@@ -183,7 +183,7 @@ contract TicTacToe {
 
         // check the game state is valid
         // check it's the player's turn
-        if(stateRootNonce % 2 == 0) {
+        if(stateNonce % 2 == 0) {
             require(msg.sender == currMatch.players[0], "Not player 1 turn");
             newState[move] = 1;
         } else {
@@ -198,12 +198,12 @@ contract TicTacToe {
             emit TerminationCancelled(matchId);
         }
 
-        bytes32 stateRoot = keccak256(abi.encode(newState, gameStatus, stateRootNonce));
+        bytes32 stateRoot = keccak256(abi.encode(newState, gameStatus, stateNonce));
         // messages signed are prepended with "\x19Ethereum Signed Message:\n32" for safety
         stateRoot = stateRoot.toEthSignedMessageHash();
 
         // Update game state
-        updateMatchState(matchId, newState, gameStatus, stateRootNonce, stateRoot);
+        updateMatchState(matchId, newState, gameStatus, stateNonce, stateRoot);
     }
 
     // bob acknowledges and cancels the termination
