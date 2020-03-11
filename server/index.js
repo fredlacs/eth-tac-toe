@@ -107,6 +107,15 @@ io.on("connection", function(socket) {
     getOpponent(socket).emit("move.made", data);
   });
 
+  socket.on("sig.exchange", function(data) {
+    if (!getOpponent(socket)) {
+      return;
+    }
+
+    // sends signature to opponent
+    getOpponent(socket).emit("sig.exchange", data);
+  });
+
   // Emit an event to the opponent when the player leaves
   socket.on("disconnect", function() {
     if (getOpponent(socket)) {

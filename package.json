@@ -13,7 +13,8 @@
     "express": "4.16.4",
     "ganache-cli": "^6.9.1",
     "socket.io": "2.1.1",
-    "truffle": "^5.1.15"
+    "truffle": "^5.1.15",
+    "web3": "^1.2.6"
   },
   "devDependencies": {
     "nodemon": "1.18.4"
