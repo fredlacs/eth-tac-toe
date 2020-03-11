@@ -113,7 +113,7 @@ io.on("connection", function(socket) {
     }
 
     // sends signature to opponent
-    getOpponent(socket).emit("send.signature", data);
+    getOpponent(socket).emit("receive.signature", data);
   });
 
   // Emit an event to the opponent when the player leaves

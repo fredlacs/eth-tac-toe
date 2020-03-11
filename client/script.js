@@ -3,8 +3,6 @@
 //   let socket = io.connect(url);
 // };
 
-import {sign} from "./state-channel.js"
-
 const url = window.location.origin;
 let socket = io.connect(url);
 let board = [0,0,0,0,0,0,0,0,0]
@@ -13,9 +11,8 @@ let contractAddress = "0x2dFc473b8305445eb44d3538Bf286460d18Df071";
 let contractAbi;
 let TicTacToe;
 
-let signatures = {}
-// was signature sent for this nonce?
-let signatureSent = [false, false, false, false, false, false, false, false, false, false]
+let mySignatures = []
+let theirSignatures = []
 
 import "./web3.min.js";
 let newWeb3 = new Web3(window.ethereum);
@@ -84,86 +81,17 @@ function renderTurnMessage() {
 }
 
 function makeMove(e) {
-
   e.preventDefault();
-  
   // It's not your turn
-  if (!myTurn) {
-    return;
-  }
-  
+  if (!myTurn) return;
   // The space is already checked
-  if ($(this).text().length) {
-    return;
-  }
-  
-
+  if ($(this).text().length) return;
   let position = $(this).attr("id")
-  
-  let index;
-  if(position == "a0") {
-    index = 0
-  } else if(position == "a1") {
-    index = 1
-  } else if(position == "a2") {
-    index = 2
-  } else if(position == "b0") {
-    index = 3
-  } else if(position == "b1") {
-    index = 4
-  } else if(position == "b2") {
-    index = 5
-  } else if(position == "c0") {
-    index = 6
-  } else if(position == "c1") {
-    index = 7
-  } else if(position == "c2") {
-    index = 8
-  } else {
-    alert("can't recognise move position")
-  }
-
-  let player = symbol == "X" ? 1 : 2
-  board[index] = player
-
-  // TODO: add matchId to stateroot
-  let gameStatus = 0
-  let stateRoot = newWeb3.utils.sha3(newWeb3.eth.abi.encodeParameters(
-    ["uint8[9]", "uint8", "uint256"], [board, gameStatus, nonce]
-  ))
-  
-  signState(stateRoot, account, function(signature){
-    // Emit the move to the server
-    socket.emit("make.move", {
-      symbol: symbol,
-      position: position
-    });
-    // send signature of state
-    socket.emit("send.signature", {
-      sender: account,
-      stateRoot: stateRoot,
-      signature: signature,
-      nonce: nonce
-    });
-
-    signatureSent[nonce] = true;
-  })
-}
-
-function signState(stateRoot, signer, callback) {
-  newWeb3.eth.sign(stateRoot, signer, function(err, signature) {
-    // on error should remove move from board?
-    if(err) alert(err)
-    else {
-      callback(signature)
-    }
-  })
-}
-
-function countMovesMade() {
-  let moves = 0
-  for(let cell of board) if(cell != 0) moves++
-  return moves
+  // Emit the move to the server
+  socket.emit("make.move", {
+    symbol: symbol,
+    position: position
+  });
 }
 
 // Event is called when either player makes a move
@@ -171,46 +99,37 @@ socket.on("move.made", function(data) {
   // Render the move
   $("#" + data.position).text(data.symbol);
 
-  // if player 1 or 2
-  let player = data.symbol == "X" ? 1 : 2
-
-  let index;
-  if(data.position == "a0") {
-    index = 0
-  } else if(data.position == "a1") {
-    index = 1
-  } else if(data.position == "a2") {
-    index = 2
-  } else if(data.position == "b0") {
-    index = 3
-  } else if(data.position == "b1") {
-    index = 4
-  } else if(data.position == "b2") {
-    index = 5
-  } else if(data.position == "c0") {
-    index = 6
-  } else if(data.position == "c1") {
-    index = 7
-  } else if(data.position == "c2") {
-    index = 8
-  } else {
-    alert("can't recognise move position")
-  }
-
-  // double clicked!
-  if(board[index] == player) return;
-
-  board[index] = player
-
   // If the symbol is the same as the player's symbol,
   // we can assume it is their turn
   myTurn = data.symbol !== symbol;
-  nonce = countMovesMade()
 
   // If the game is still going, show who's turn it is
   if (!isGameOver()) {
-    renderTurnMessage();
+    let index = getIndexFromPosition(data.position)
+    let player = getPlayerFromSymbol(data.symbol)
+    nonce = countMovesMade()
 
+    // received the same move twice! did you double click?
+    if(board[index] == player) return;
+    board[index] = player
+
+    // TODO: add matchId to stateroot
+    let gameStatus = 0
+    let stateRoot = newWeb3.utils.sha3(newWeb3.eth.abi.encodeParameters(
+      ["uint8[9]", "uint8", "uint256"], [board, gameStatus, nonce]
+    ))
+    
+    signState(stateRoot, account, function(signature){
+      // send signature of state
+      socket.emit("send.signature", {
+        sender: account,
+        stateRoot: stateRoot,
+        signature: signature,
+        nonce: nonce
+      });
+    })
+
+    renderTurnMessage();
     // If the game is over
   } else {
     // Show the message for the loser
@@ -251,7 +170,7 @@ socket.on("game.begin", function(data) {
     });
 
     $("#messages").text("Waiting for state channel to be created");
-    $(".board button").attr("disabled", true);
+    // $(".board button").attr("disabled", true);
     
     // start match on chain
     $(".board button").removeAttr("disabled");
@@ -261,23 +180,11 @@ socket.on("game.begin", function(data) {
     $(".board button").attr("disabled", true);
   }
 
-  // renderTurnMessage();
+  renderTurnMessage();
 });
 
-socket.on("send.signature", function(data) {
-  // save other parties signature together with your own
-  if(!signatureSent[data.nonce]) {
-    // assume the person sent the correct root
-    signState(data.stateRoot, account, function(signature){
-      // Emit the move to the server
-      socket.emit("send.signature", {
-        sender: account,
-        stateRoot: data.stateRoot,
-        signature: signature,
-        nonce: data.nonce
-      });
-    })
-  }
+socket.on("receive.signature", function(data) {
+  console.log("received signature")
   console.log(data)
 })
 
@@ -287,7 +194,55 @@ socket.on("opponent.left", function() {
   $(".board button").attr("disabled", true);
 });
 
+
 $(function() {
   $(".board button").attr("disabled", true);
   $(".board> button").on("click", makeMove);
 });
+
+// utility functions
+
+function signState(stateRoot, signer, callback) {
+  newWeb3.eth.sign(stateRoot, signer, function(err, signature) {
+    // on error should remove move from board?
+    if(err) alert(err)
+    else {
+      callback(signature)
+    }
+  })
+}
+
+function countMovesMade() {
+  let moves = 0
+  for(let cell of board) if(cell != 0) moves++
+  return moves
+}
+
+function getIndexFromPosition(position) {
+  if(position == "a0") {
+    return 0
+  } else if(position == "a1") {
+    return 1
+  } else if(position == "a2") {
+    return 2
+  } else if(position == "b0") {
+    return 3
+  } else if(position == "b1") {
+    return 4
+  } else if(position == "b2") {
+    return 5
+  } else if(position == "c0") {
+    return 6
+  } else if(position == "c1") {
+    return 7
+  } else if(position == "c2") {
+    return 8
+  } else {
+    alert("can't recognise move position")
+    return;
+  }
+}
+
+function getPlayerFromSymbol(symbol) {
+  return symbol == "X" ? 1 : 2
+}
