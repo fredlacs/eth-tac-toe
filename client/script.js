@@ -38,18 +38,36 @@ startButton.addEventListener('click', function() {
     TicTacToe = new newWeb3.eth.Contract(contractAbi, contractAddress);
 
     let disputeLength = 2000
-    console.log(opponentAddress)
     TicTacToe.methods.startMatch(opponentAddress.toString(), disputeLength).send(
       {from: account}
     ).then(
       function(receipt) {
         matchId = receipt.events.MatchStarted.returnValues.matchId
+        matchId = newWeb3.utils.hexToBytes(matchId)
+        // console.log(newWeb3.utils.isHex(matchId))
+        // console.log(matchId.length)
+        // console.log(newWeb3.utils.fromAscii(matchId.substr(1)))
+        // console.log(matchId.substr(1))
+
+
         renderTurnMessage();
       }
     )
   });
-
 });
+
+document.getElementById("printButton").addEventListener('click', function() {
+  console.log("nonce")
+  console.log(nonce)
+  console.log("player1 sig")
+  console.log(mySignatures)
+  console.log("player2 sig")
+  console.log(theirSignatures)
+  console.log("board state")
+  console.log(board)
+  console.log("match id")
+  console.log(newWeb3.utils.bytesToHex(matchId).toString())
+})
 
 
 function getBoardState() {
@@ -114,6 +132,7 @@ function makeMove(e) {
   let position = $(this).attr("id")
   // Emit the move to the server
   socket.emit("make.move", {
+    matchId: matchId,
     symbol: symbol,
     position: position
   });
@@ -123,6 +142,7 @@ function makeMove(e) {
 socket.on("move.made", function(data) {
   // Render the move
   $("#" + data.position).text(data.symbol);
+  matchId = data.matchId
 
   // If the symbol is the same as the player's symbol,
   // we can assume it is their turn
@@ -141,7 +161,7 @@ socket.on("move.made", function(data) {
     // TODO: add matchId to stateroot
     let gameStatus = 0
     let stateRoot = newWeb3.utils.sha3(newWeb3.eth.abi.encodeParameters(
-      ["uint8[9]", "uint8", "uint256"], [board, gameStatus, nonce]
+      ["bytes32", "uint8[9]", "uint8", "uint256"], [matchId, board, gameStatus, nonce]
     ))
     
     signState(stateRoot, account, function(signature){

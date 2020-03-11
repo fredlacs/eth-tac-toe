@@ -103,15 +103,16 @@ contract TicTacToe {
     {
         Match memory currMatch = matches[matchId];
 
+        // either nonce is bigger, or first state update with nonce 0
         require(
-            stateNonce > currMatch.currentStateNonce,
+            stateNonce > currMatch.currentStateNonce || (stateNonce == 0 && currMatch.currentStateRoot == 0),
             "Trying to update a state with a nonce smaller than the current one"
         );
 
         // users should have signed this state root
-        bytes32 stateRoot = keccak256(abi.encode(boardState, gameStatus, stateNonce));
+        bytes32 stateRoot = keccak256(abi.encode(matchId, boardState, gameStatus, stateNonce));
         // messages signed are prepended with "\x19Ethereum Signed Message:\n32" for safety
-        stateRoot = stateRoot.toEthSignedMessageHash();
+        // stateRoot = stateRoot.toEthSignedMessageHash();
 
         // get address used to sign state root
         address[2] memory players = [
