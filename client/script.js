@@ -9,11 +9,21 @@ const url = window.location.origin;
 let socket = io.connect(url);
 let board = [0,0,0,0,0,0,0,0,0]
 let nonce = 0;
+let contractAddress = "0x2dFc473b8305445eb44d3538Bf286460d18Df071";
+let contractAbi;
+let TicTacToe;
 
 let signatures = {}
 
 import "./web3.min.js";
-let newWeb3 = new Web3();
+let newWeb3 = new Web3(window.ethereum);
+
+let account;
+// set account
+newWeb3.eth.getAccounts( (err, accounts) => {
+  if(err) alert(err)
+  account = accounts[0]
+})
 
 var myTurn = true,
   symbol;
@@ -114,43 +124,47 @@ function makeMove(e) {
   let player = symbol == "X" ? 1 : 2
   board[index] = player
 
-  
-  // if player
+  // TODO: add matchId to stateroot
   let gameStatus = 0
-
-
-
-  let stateRoot = web3.sha3(newWeb3.eth.abi.encodeParameters(
+  let stateRoot = newWeb3.utils.sha3(newWeb3.eth.abi.encodeParameters(
     ["uint8[9]", "uint8", "uint256"], [board, gameStatus, nonce]
   ))
-
   
-  
+  signState(stateRoot, account, function(signature){
+    // Emit the move to the server
+    socket.emit("make.move", {
+      symbol: symbol,
+      position: position
+    });
+    // send signature of state
+    socket.emit("send.signature", {
+      sender: account,
+      signature: signature,
+      nonce: nonce
+    });
+  })
+}
 
-
-  web3.eth.getAccounts( (err, accounts) => {
+function signState(stateRoot, signer, callback) {
+  newWeb3.eth.sign(stateRoot, signer, function(err, signature) {
     if(err) alert(err)
-    let signer = accounts[0]
-    web3.eth.sign(signer, stateRoot, function(err, signature) {
-        if(err) alert(err)
-        else {
-          signatures[nonce] = [signature]
-          // Emit the move to the server
-          socket.emit("make.move", {
-            symbol: symbol,
-            position: position,
-            signature: signature,
-            nonce: nonce
-          });
-        }
-  })})
-  
+    else {
+      callback(signature)
+    }
+  })
+}
+
+function countMovesMade() {
+  let moves = 0
+  for(let cell of board) if(cell != 0) moves++
+  return moves
 }
 
 // Event is called when either player makes a move
 socket.on("move.made", function(data) {
   // Render the move
   $("#" + data.position).text(data.symbol);
+  nonce = countMovesMade()
 
   // if player 1 or 2
   let player = data.symbol == "X" ? 1 : 2
@@ -188,32 +202,19 @@ socket.on("move.made", function(data) {
   if(myTurn) {
     let gameStatus = 0
 
-    let stateRoot = web3.sha3(newWeb3.eth.abi.encodeParameters(
-      ["uint8[9]", "uint8", "uint256"], [board, gameStatus, nonce]
+    // state root of nonce-1 because you are signing the previous move
+    let stateRoot = newWeb3.utils.sha3(newWeb3.eth.abi.encodeParameters(
+      ["uint8[9]", "uint8", "uint256"], [board, gameStatus, nonce-1]
     ))
 
-    web3.eth.getAccounts( (err, accounts) => {
-      if(err) alert(err)
-      let signer = accounts[0]
-      web3.eth.sign(signer, stateRoot, function(err, signature) {
-          if(err) alert(err)
-          else {
-            // store both signatures
-            signatures[nonce] = [signature, data.signature]
-
-            // Emit the move to the server
-            socket.emit("sig.exchange", {
-              signature: signature,
-              nonce: nonce
-            });
-
-            nonce += 1;
-          }
-    })})
-
-  } else {
-    // you just moved
-    nonce += 1;
+    signState(stateRoot, account, function(signature){
+      // Emit the move to the server
+      socket.emit("send.signature", {
+        sender: account,
+        signature: signature,
+        nonce: nonce
+      });
+    })
   }
 
   // If the game is still going, show who's turn it is
@@ -243,14 +244,41 @@ socket.on("game.begin", function(data) {
 
   // Give X the first turn
   myTurn = symbol === "X";
-  renderTurnMessage();
+
+  if(myTurn) {
+    $.getJSON("TicTacToe.json", function(json) {
+      contractAbi = json.abi
+      TicTacToe = new newWeb3.eth.Contract(contractAbi, contractAddress);
+
+      // TicTacToe.methods.startMatch("0xb286B84be7B9A04027a145B3A7e455D850a75884", 2000).send(
+      //   {from: "0x24cDb6A9b504EC3E1394a0b0c2c751D28959bA29"}
+      // ).then(
+      //   function(receipt) {
+      //     console.log(receipt)
+      //   }
+      // )
+
+    });
+
+    $("#messages").text("Waiting for state channel to be created");
+    $(".board button").attr("disabled", true);
+    
+    // start match on chain
+    $(".board button").removeAttr("disabled");
+
+  } else {
+    $("#messages").text("Waiting for opponent to initiate state channel");
+    $(".board button").attr("disabled", true);
+  }
+
+  // renderTurnMessage();
 });
 
-socket.on("sig.exchange", function(data) {
+socket.on("send.signature", function(data) {
   // save other parties signature together with your own
-  let yourSig = signatures[data.nonce][0]
-  signatures[data.nonce] = [yourSig, data.signature]
-  // console.log(signatures)
+  // signatures[data.nonce] = [data.signature]
+  console.log("heeere")
+  console.log(data)
 })
 
 // Disable the board if the opponent leaves

@@ -198,7 +198,7 @@ contract TicTacToe {
             emit TerminationCancelled(matchId);
         }
 
-        bytes32 stateRoot = keccak256(abi.encode(newState, gameStatus, stateNonce));
+        bytes32 stateRoot = keccak256(abi.encode(matchId, newState, gameStatus, stateNonce));
         // messages signed are prepended with "\x19Ethereum Signed Message:\n32" for safety
         stateRoot = stateRoot.toEthSignedMessageHash();
 
@@ -210,7 +210,7 @@ contract TicTacToe {
         }
     }
 
-    function isWinningState(uint8[9] state) internal returns (bool) {
+    function isWinningState(uint8[9] memory state) internal returns (bool) {
         uint8[8] memory rows = [
             state[0] & state[1] & state[2],
             state[3] & state[4] & state[5],
