@@ -120,6 +120,7 @@ socket.on("move.made", function(data) {
     ))
     
     signState(stateRoot, account, function(signature){
+      mySignatures[nonce] = signature
       // send signature of state
       socket.emit("send.signature", {
         sender: account,
@@ -132,6 +133,7 @@ socket.on("move.made", function(data) {
     renderTurnMessage();
     // If the game is over
   } else {
+    // TODO: add game win logic
     // Show the message for the loser
     if (myTurn) {
       $("#messages").text("Game over. You lost.");
@@ -184,8 +186,7 @@ socket.on("game.begin", function(data) {
 });
 
 socket.on("receive.signature", function(data) {
-  console.log("received signature")
-  console.log(data)
+  theirSignatures[data.nonce] = data.signature
 })
 
 // Disable the board if the opponent leaves
