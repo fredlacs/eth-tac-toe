@@ -14,28 +14,6 @@ let opponentAddress;
 let matchId;
 
 let startButton = document.getElementById("startMatchButton");
-
-startButton.addEventListener('click', function() {
-  opponentAddress = document.getElementById("opponentAddress")
-  console.log(opponentAddress.value)
-
-  $.getJSON("TicTacToe.json", function(json) {
-    contractAbi = json.abi
-    TicTacToe = new newWeb3.eth.Contract(contractAbi, contractAddress);
-
-    TicTacToe.methods.startMatch("0xb286B84be7B9A04027a145B3A7e455D850a75884", 2000).send(
-      {from: "0x24cDb6A9b504EC3E1394a0b0c2c751D28959bA29"}
-    ).then(
-      function(receipt) {
-        matchId = receipt.events.MatchStarted.returnValues.matchId
-        renderTurnMessage();
-      }
-    )
-  });
-
-});
-
-
 let mySignatures = []
 let theirSignatures = []
 
@@ -51,6 +29,28 @@ newWeb3.eth.getAccounts( (err, accounts) => {
 
 var myTurn = true,
   symbol;
+
+startButton.addEventListener('click', function() {
+  opponentAddress = document.getElementById("opponentAddress").value
+
+  $.getJSON("TicTacToe.json", function(json) {
+    contractAbi = json.abi
+    TicTacToe = new newWeb3.eth.Contract(contractAbi, contractAddress);
+
+    let disputeLength = 2000
+    console.log(opponentAddress)
+    TicTacToe.methods.startMatch(opponentAddress.toString(), disputeLength).send(
+      {from: account}
+    ).then(
+      function(receipt) {
+        matchId = receipt.events.MatchStarted.returnValues.matchId
+        renderTurnMessage();
+      }
+    )
+  });
+
+});
+
 
 function getBoardState() {
   var obj = {};
