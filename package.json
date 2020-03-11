@@ -7,7 +7,8 @@
     "start": "nodemon server/index.js localhost 8080",
     "testrpc": "ganache-cli --defaultBalanceEther 99999999999 --networkId 1234 -m 'dltlt'",
     "deploy": "truffle migrate",
-    "compile": "truffle compile"
+    "compile": "truffle compile",
+    "test": "truffle test"
   },
   "dependencies": {
     "express": "4.16.4",

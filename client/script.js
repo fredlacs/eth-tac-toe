@@ -10,6 +10,31 @@ let nonce = 0;
 let contractAddress = "0x2dFc473b8305445eb44d3538Bf286460d18Df071";
 let contractAbi;
 let TicTacToe;
+let opponentAddress;
+let matchId;
+
+let startButton = document.getElementById("startMatchButton");
+
+startButton.addEventListener('click', function() {
+  opponentAddress = document.getElementById("opponentAddress")
+  console.log(opponentAddress.value)
+
+  $.getJSON("TicTacToe.json", function(json) {
+    contractAbi = json.abi
+    TicTacToe = new newWeb3.eth.Contract(contractAbi, contractAddress);
+
+    TicTacToe.methods.startMatch("0xb286B84be7B9A04027a145B3A7e455D850a75884", 2000).send(
+      {from: "0x24cDb6A9b504EC3E1394a0b0c2c751D28959bA29"}
+    ).then(
+      function(receipt) {
+        matchId = receipt.events.MatchStarted.returnValues.matchId
+        renderTurnMessage();
+      }
+    )
+  });
+
+});
+
 
 let mySignatures = []
 let theirSignatures = []
@@ -157,32 +182,15 @@ socket.on("game.begin", function(data) {
   myTurn = symbol === "X";
 
   if(myTurn) {
-    $.getJSON("TicTacToe.json", function(json) {
-      contractAbi = json.abi
-      TicTacToe = new newWeb3.eth.Contract(contractAbi, contractAddress);
-
-      // TicTacToe.methods.startMatch("0xb286B84be7B9A04027a145B3A7e455D850a75884", 2000).send(
-      //   {from: "0x24cDb6A9b504EC3E1394a0b0c2c751D28959bA29"}
-      // ).then(
-      //   function(receipt) {
-      //     console.log(receipt)
-      //   }
-      // )
-
-    });
-
     $("#messages").text("Waiting for state channel to be created");
-    // $(".board button").attr("disabled", true);
-    
-    // start match on chain
-    $(".board button").removeAttr("disabled");
-
+    $(".board button").attr("disabled", true);
+    document.getElementById("opponentAddress").style.visibility = "visible"
+    document.getElementById("startMatchButton").style.visibility = "visible"
   } else {
     $("#messages").text("Waiting for opponent to initiate state channel");
     $(".board button").attr("disabled", true);
   }
 
-  renderTurnMessage();
 });
 
 socket.on("receive.signature", function(data) {
