@@ -14,6 +14,8 @@ let contractAbi;
 let TicTacToe;
 
 let signatures = {}
+// was signature sent for this nonce?
+let signatureSent = [false, false, false, false, false, false, false, false, false, false]
 
 import "./web3.min.js";
 let newWeb3 = new Web3(window.ethereum);
@@ -139,14 +141,18 @@ function makeMove(e) {
     // send signature of state
     socket.emit("send.signature", {
       sender: account,
+      stateRoot: stateRoot,
       signature: signature,
       nonce: nonce
     });
+
+    signatureSent[nonce] = true;
   })
 }
 
 function signState(stateRoot, signer, callback) {
   newWeb3.eth.sign(stateRoot, signer, function(err, signature) {
+    // on error should remove move from board?
     if(err) alert(err)
     else {
       callback(signature)
@@ -164,7 +170,6 @@ function countMovesMade() {
 socket.on("move.made", function(data) {
   // Render the move
   $("#" + data.position).text(data.symbol);
-  nonce = countMovesMade()
 
   // if player 1 or 2
   let player = data.symbol == "X" ? 1 : 2
@@ -192,30 +197,15 @@ socket.on("move.made", function(data) {
     alert("can't recognise move position")
   }
 
+  // double clicked!
+  if(board[index] == player) return;
+
   board[index] = player
 
   // If the symbol is the same as the player's symbol,
   // we can assume it is their turn
   myTurn = data.symbol !== symbol;
-
-  // if it is my turn, opponent just moved
-  if(myTurn) {
-    let gameStatus = 0
-
-    // state root of nonce-1 because you are signing the previous move
-    let stateRoot = newWeb3.utils.sha3(newWeb3.eth.abi.encodeParameters(
-      ["uint8[9]", "uint8", "uint256"], [board, gameStatus, nonce-1]
-    ))
-
-    signState(stateRoot, account, function(signature){
-      // Emit the move to the server
-      socket.emit("send.signature", {
-        sender: account,
-        signature: signature,
-        nonce: nonce
-      });
-    })
-  }
+  nonce = countMovesMade()
 
   // If the game is still going, show who's turn it is
   if (!isGameOver()) {
@@ -276,8 +266,18 @@ socket.on("game.begin", function(data) {
 
 socket.on("send.signature", function(data) {
   // save other parties signature together with your own
-  // signatures[data.nonce] = [data.signature]
-  console.log("heeere")
+  if(!signatureSent[data.nonce]) {
+    // assume the person sent the correct root
+    signState(data.stateRoot, account, function(signature){
+      // Emit the move to the server
+      socket.emit("send.signature", {
+        sender: account,
+        stateRoot: data.stateRoot,
+        signature: signature,
+        nonce: data.nonce
+      });
+    })
+  }
   console.log(data)
 })
 
