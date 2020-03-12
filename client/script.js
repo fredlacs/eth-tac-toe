@@ -14,6 +14,7 @@ let opponentAddress;
 let matchId;
 
 let startButton = document.getElementById("startMatchButton");
+let winButton = document.getElementById("winButton");
 let mySignatures = []
 let theirSignatures = []
 
@@ -21,53 +22,54 @@ import "./web3.min.js";
 let newWeb3 = new Web3(window.ethereum);
 
 let account;
+let player1 = false;
+
 // set account
 newWeb3.eth.getAccounts( (err, accounts) => {
   if(err) alert(err)
   account = accounts[0]
 })
 
+// instantiate smart contract object
+$.getJSON("TicTacToe.json", function(json) {
+  contractAbi = json.abi
+  TicTacToe = new newWeb3.eth.Contract(contractAbi, contractAddress);
+});
+
 var myTurn = true,
   symbol;
 
+winButton.addEventListener('click', function() {
+  // if you are player 1 and won, game status == 1, else 2
+  let gameStatus = player1 ? 1 : 2
+  // if you are player 1, your signature is signature 
+  let signature1 = player1 ? mySignatures[nonce] : theirSignatures[nonce]
+  let signature2 = player1 ? theirSignatures[nonce] : mySignatures[nonce]
+
+  TicTacToe.methods.sendStateUpdate(
+    matchId, board, gameStatus, nonce, signature1, signature2
+  ).send(
+    {from: account}
+  ).then(
+    function(receipt) {
+      alert("win was submitted to smart contract")
+    }
+  )
+})
+
+
 startButton.addEventListener('click', function() {
   opponentAddress = document.getElementById("opponentAddress").value
-
-  $.getJSON("TicTacToe.json", function(json) {
-    contractAbi = json.abi
-    TicTacToe = new newWeb3.eth.Contract(contractAbi, contractAddress);
-
-    let disputeLength = 2000
-    TicTacToe.methods.startMatch(opponentAddress.toString(), disputeLength).send(
-      {from: account}
-    ).then(
-      function(receipt) {
-        matchId = receipt.events.MatchStarted.returnValues.matchId
-        matchId = newWeb3.utils.hexToBytes(matchId)
-        // console.log(newWeb3.utils.isHex(matchId))
-        // console.log(matchId.length)
-        // console.log(newWeb3.utils.fromAscii(matchId.substr(1)))
-        // console.log(matchId.substr(1))
-
-
-        renderTurnMessage();
-      }
-    )
-  });
+  let disputeLength = 2000
+  TicTacToe.methods.startMatch(opponentAddress.toString(), disputeLength).send(
+    {from: account}
+  ).then(function(receipt) {
+    matchId = receipt.events.MatchStarted.returnValues.matchId
+    matchId = newWeb3.utils.hexToBytes(matchId)
+    player1 = true;
+    renderTurnMessage();
+  })
 });
-
-document.getElementById("printButton").addEventListener('click', function() {
-  console.log("nonce")
-  console.log(nonce)
-  console.log("player1 sig")
-  console.log(mySignatures)
-  console.log("player2 sig")
-  console.log(theirSignatures)
-  console.log("board state")
-  console.log(board)
-  console.log("match id")
-  console.log(newWeb3.utils.bytesToHex(matchId).toString())
-})
 
 
 function getBoardState() {
@@ -147,18 +149,17 @@ socket.on("move.made", function(data) {
   // If the symbol is the same as the player's symbol,
   // we can assume it is their turn
   myTurn = data.symbol !== symbol;
+  nonce = countMovesMade()
 
   // If the game is still going, show who's turn it is
   if (!isGameOver()) {
     let index = getIndexFromPosition(data.position)
     let player = getPlayerFromSymbol(data.symbol)
-    nonce = countMovesMade()
 
     // received the same move twice! did you double click?
     if(board[index] == player) return;
     board[index] = player
 
-    // TODO: add matchId to stateroot
     let gameStatus = 0
     let stateRoot = newWeb3.utils.sha3(newWeb3.eth.abi.encodeParameters(
       ["bytes32", "uint8[9]", "uint8", "uint256"], [matchId, board, gameStatus, nonce]
@@ -178,15 +179,33 @@ socket.on("move.made", function(data) {
     renderTurnMessage();
     // If the game is over
   } else {
-    // TODO: add game win logic
     // Show the message for the loser
+    let gameStatus;
+
     if (myTurn) {
       $("#messages").text("Game over. You lost.");
-
+      gameStatus = player1 ? 2 : 1
       // Show the message for the winner
     } else {
       $("#messages").text("Game over. You won!");
+      gameStatus = player1 ? 1 : 2
+      winButton.style.visibility = "visible"
     }
+
+    let stateRoot = newWeb3.utils.sha3(newWeb3.eth.abi.encodeParameters(
+      ["bytes32", "uint8[9]", "uint8", "uint256"], [matchId, board, gameStatus, nonce]
+    ))
+    
+    signState(stateRoot, account, function(signature){
+      mySignatures[nonce] = signature
+      // send signature of state
+      socket.emit("send.signature", {
+        sender: account,
+        stateRoot: stateRoot,
+        signature: signature,
+        nonce: nonce
+      });
+    })
 
     // Disable the board
     $(".board button").attr("disabled", true);
