@@ -29,7 +29,7 @@ contract TicTacToe {
     }
 
     // map from player address to his stats
-    mapping(address => Player) playerStats;
+    mapping(address => Player) public playerStats;
     // map from matchId to current state of that match
     mapping(bytes32 => Match) matches;
 
@@ -211,7 +211,7 @@ contract TicTacToe {
         }
     }
 
-    function isWinningState(uint8[9] memory state) internal returns (bool) {
+    function isWinningState(uint8[9] memory state) internal pure returns (bool) {
         uint8[8] memory rows = [
             state[0] & state[1] & state[2],
             state[3] & state[4] & state[5],

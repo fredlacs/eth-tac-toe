@@ -15,6 +15,7 @@ let matchId;
 
 let startButton = document.getElementById("startMatchButton");
 let winButton = document.getElementById("winButton");
+let statsButton = document.getElementById("statsButton");
 let mySignatures = []
 let theirSignatures = []
 
@@ -55,6 +56,12 @@ winButton.addEventListener('click', function() {
       alert("win was submitted to smart contract")
     }
   )
+})
+
+statsButton.addEventListener('click', function() {
+  TicTacToe.methods.playerStats(account).call().then(function(stats) {
+      alert(`Wins: ${stats.wins} | Losses: ${stats.losses}`)
+  })
 })
 
 
