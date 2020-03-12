@@ -1,13 +1,10 @@
 pragma solidity ^0.5.0;
 
 import "./Libraries/SafeMath.sol";
-import "./Libraries/RLP.sol";
 import "./Libraries/ECDSA.sol";
 
 contract TicTacToe {
     using SafeMath for uint256;
-    using RLPReader for RLPReader.RLPItem;
-    using RLPReader for bytes;
     using ECDSA for bytes32;
 
     struct Player {
