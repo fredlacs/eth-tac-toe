@@ -260,7 +260,7 @@ contract TicTacToe {
         address looser = matches[matchId].players[0] == winner ? matches[matchId].players[1] : matches[matchId].players[0];
 
         playerStats[winner].wins = playerStats[winner].wins.add(1);
-        playerStats[looser].losses = playerStats[winner].wins.add(1);
+        playerStats[looser].losses = playerStats[looser].wins.add(1);
 
         // game finished
         matches[matchId].inProgress = false;
