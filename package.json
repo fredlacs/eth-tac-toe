@@ -13,7 +13,7 @@
   "dependencies": {
     "express": "4.16.4",
     "ganache-cli": "^6.9.1",
-    "socket.io": "2.1.1",
+    "socket.io": "2.4.0",
     "truffle": "^5.1.15",
     "web3": "^1.2.6"
   },
