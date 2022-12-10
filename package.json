@@ -11,7 +11,7 @@
     "test": "truffle test"
   },
   "dependencies": {
-    "express": "4.16.4",
+    "express": "4.17.3",
     "ganache-cli": "^6.9.1",
     "socket.io": "2.1.1",
     "truffle": "^5.1.15",
